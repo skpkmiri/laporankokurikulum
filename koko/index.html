@@ -272,8 +272,8 @@ export default function App() {
       perjumpaan: '1', unit: activities[0] || '', tarikh: '', tajuk: '', aktiviti: '', 
       laporanMurid: null, rumusan: '', kemahiranBerfikir: '', 
       kataKerjaKbat: '', ulasanKbat: '', disediakanOleh: '', namaDisediakan: '', 
-      ulasan1: '', ulasan2: '', ulasan3: '', ulasan4: '', ulasan5: '',
-      gambar1: null, gambar2: null, gambar3: null, gambar4: null, gambar5: null
+      ulasan1: '', ulasan2: '', ulasan3: '', ulasan4: '', ulasan5: '', ulasan6: '',
+      gambar1: null, gambar2: null, gambar3: null, gambar4: null, gambar5: null, gambar6: null
     });
 
     useEffect(() => {
@@ -392,9 +392,9 @@ export default function App() {
 
           {/* DOKUMENTASI GAMBAR */}
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-6">
-            <h3 className="font-bold text-slate-800 text-xs uppercase tracking-widest">Dokumentasi Bergambar (Maksimum 5)</h3>
+            <h3 className="font-bold text-slate-800 text-xs uppercase tracking-widest">Dokumentasi Bergambar (Maksimum 6)</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5].map(num => (
+              {[1, 2, 3, 4, 5, 6].map(num => (
                 <div key={num} className="bg-white p-3 rounded-xl shadow-sm space-y-3">
                   <ImageUpload label={`Gambar ${num}`} field={`gambar${num}`} />
                   <input type="text" className="w-full p-2 border rounded-lg text-[10px] outline-none" placeholder={`Ulasan Gambar ${num}...`} value={formData[`ulasan${num}`]} onChange={e => setFormData({...formData, [`ulasan${num}`]: e.target.value})} />
@@ -507,7 +507,7 @@ export default function App() {
     }, [isSigning]);
 
     if (selected) {
-      const ulasanGambar = [1, 2, 3, 4, 5].map(n => ({ pic: selected[`gambar${n}`], text: selected[`ulasan${n}`] })).filter(i => i.pic || i.text);
+      const ulasanGambar = [1, 2, 3, 4, 5, 6].map(n => ({ pic: selected[`gambar${n}`], text: selected[`ulasan${n}`] })).filter(i => i.pic || i.text);
 
       return (
         <div className="max-w-[210mm] mx-auto bg-white p-4 md:p-10 lg:p-12 shadow-2xl border-slate-200 print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none">
@@ -573,10 +573,10 @@ export default function App() {
             {ulasanGambar.length > 0 && (
               <div className="mt-6 space-y-4 break-inside-avoid">
                 <h4 className="font-bold uppercase text-[10px] bg-slate-100 p-1 border-2 border-slate-800">Dokumentasi Bergambar</h4>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   {ulasanGambar.map((item, idx) => (
                     <div key={idx} className="border-2 border-slate-800 p-2 flex flex-col items-center">
-                      <img src={item.pic} className="w-full h-48 object-cover border border-slate-300" alt={`Gambar ${idx+1}`} />
+                      <img src={item.pic} className="w-full h-32 object-cover border border-slate-300" alt={`Gambar ${idx+1}`} />
                       <p className="mt-2 text-[9px] text-center font-bold uppercase italic">{item.text || 'Tiada Ulasan'}</p>
                     </div>
                   ))}
