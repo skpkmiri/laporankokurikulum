@@ -76,15 +76,15 @@ const parseCSV = (str) => {
   return arr;
 };
 
-// Fungsi Pintar Mengambil CSV dengan Pelbagai Laluan Sandaran tanpa Headers ketat
+// Fungsi Pintar Mengambil CSV
 const fetchCSVData = async (rawUrl) => {
   if (!rawUrl) return null;
   const url = rawUrl.trim();
   const cacheBusterUrl = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
   
   const proxies = [
-    url, // 1. Direct tanpa cache buster
-    cacheBusterUrl, // 2. Direct dengan cache buster
+    url, 
+    cacheBusterUrl,
     `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
     `https://corsproxy.io/?${encodeURIComponent(url)}`
@@ -92,7 +92,6 @@ const fetchCSVData = async (rawUrl) => {
 
   for (let proxy of proxies) {
     try {
-      // Dibuang { cache: "no-store" } untuk mengelakkan ralat CORS Preflight pelayar
       const response = await fetch(proxy);
       if (response.ok) {
         const text = await response.text();
@@ -106,7 +105,6 @@ const fetchCSVData = async (rawUrl) => {
     }
   }
 
-  // AllOrigins JSON endpoint as final fallback
   try {
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
     const response = await fetch(proxyUrl);
@@ -136,7 +134,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // LIVE DATA STATES (2-Sheet setup)
+  // LIVE DATA STATES
   const DEFAULT_MURID_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyXz6iABc4zz0gpRMqo0xgzZtUmw9BSwkrbYq2Mc0c0hcnwg-pZTIm9XE1S2g5B_4wnblhRSAiO28V/pub?gid=0&single=true&output=csv';
   const DEFAULT_GURU_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyXz6iABc4zz0gpRMqo0xgzZtUmw9BSwkrbYq2Mc0c0hcnwg-pZTIm9XE1S2g5B_4wnblhRSAiO28V/pub?gid=33896881&single=true&output=csv';
 
@@ -147,7 +145,6 @@ export default function App() {
   const [teachers, setTeachers] = useState([]);
   const [activities, setActivities] = useState(['PILIH AKTIVITI']);
 
-  // Auth & Firestore Sync for Reports & Config
   useEffect(() => {
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -179,7 +176,7 @@ export default function App() {
     return () => { unsubReports(); unsubAttendance(); unsubConfig(); };
   }, [user]);
 
-  // AUTO FETCH GOOGLE SHEETS LIVE DATA (MURID & GURU)
+  // AUTO FETCH GOOGLE SHEETS LIVE DATA
   useEffect(() => {
     const fetchLiveCSV = async () => {
       let newStudents = [];
@@ -188,7 +185,6 @@ export default function App() {
       let successMurid = false;
       let successGuru = false;
 
-      // FETCH MURID (Lajur A: Nama, Lajur B: Aktiviti/Kelab/Sukan/Uniform)
       if (csvLinkMurid) {
         try {
           const text = await fetchCSVData(csvLinkMurid);
@@ -198,16 +194,15 @@ export default function App() {
             if (!row || row.length === 0) continue;
             
             const name = (row[0] || '').trim();
-            const aktiviti1 = (row[1] || '').trim().toUpperCase(); // B
-            const aktiviti2 = (row[2] || '').trim().toUpperCase(); // C (In case they still use it)
-            const aktiviti3 = (row[3] || '').trim().toUpperCase(); // D (In case they still use it)
+            const act1 = (row[1] || '').trim().toUpperCase(); 
+            const act2 = (row[2] || '').trim().toUpperCase(); 
+            const act3 = (row[3] || '').trim().toUpperCase(); 
 
             if (name && name.toLowerCase() !== 'nama murid') {
-              // Simpan semua kemungkinan aktiviti untuk sokongan berbilang lajur atau satu lajur
-              newStudents.push({ id: `S${i}`, name, kelab: aktiviti1, sukan: aktiviti2, uniform: aktiviti3 });
-              if (aktiviti1 && aktiviti1 !== '-') newActivities.add(aktiviti1);
-              if (aktiviti2 && aktiviti2 !== '-') newActivities.add(aktiviti2);
-              if (aktiviti3 && aktiviti3 !== '-') newActivities.add(aktiviti3);
+              newStudents.push({ id: `S${i}`, name, act1, act2, act3 });
+              if (act1 && act1 !== '-') newActivities.add(act1);
+              if (act2 && act2 !== '-') newActivities.add(act2);
+              if (act3 && act3 !== '-') newActivities.add(act3);
             }
           }
           successMurid = true;
@@ -218,7 +213,6 @@ export default function App() {
         }
       }
 
-      // FETCH GURU (Lajur A: Nama Guru)
       if (csvLinkGuru) {
         try {
           const text = await fetchCSVData(csvLinkGuru);
@@ -264,8 +258,6 @@ export default function App() {
     { id: 'rumusan', label: 'Rumusan', icon: Icons.PieChart },
     { id: 'tetapan', label: 'Tetapan', icon: Icons.Settings },
   ];
-
-  // --- SUB-COMPONENTS ---
 
   const LaporanForm = () => {
     const [formData, setFormData] = useState({
@@ -338,7 +330,6 @@ export default function App() {
           <Icons.PenTool /> Daftar Laporan Mingguan
         </h2>
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* ASAS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Perjumpaan</label>
@@ -362,7 +353,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* AKTIVITI & RUMUSAN */}
           <div className="space-y-4">
             <div>
               <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Huraian Aktiviti*</label>
@@ -376,7 +366,6 @@ export default function App() {
 
           <ImageUpload label="Laporan Murid (Lampiran)" field="laporanMurid" />
 
-          {/* KBAT */}
           <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 space-y-4">
             <h3 className="font-bold text-blue-900 text-xs uppercase tracking-widest">Elemen KBAT</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -390,7 +379,6 @@ export default function App() {
             <input type="text" required className="w-full p-3 border rounded-lg bg-white outline-none text-sm" placeholder="Ulasan elemen KBAT..." value={formData.ulasanKbat} onChange={e => setFormData({...formData, ulasanKbat: e.target.value})} />
           </div>
 
-          {/* DOKUMENTASI GAMBAR */}
           <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-6">
             <h3 className="font-bold text-slate-800 text-xs uppercase tracking-widest">Dokumentasi Bergambar (Maksimum 6)</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -403,7 +391,6 @@ export default function App() {
             </div>
           </div>
 
-          {/* PENGESAHAN */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t">
             <div className="space-y-3">
               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Disediakan Oleh</h4>
@@ -457,7 +444,6 @@ export default function App() {
       } catch (e) { showToast('Gagal simpan e-sign.'); }
     };
 
-    // Signature Logic
     useEffect(() => {
       if (!isSigning || !canvasRef.current) return;
       const canvas = canvasRef.current;
@@ -646,13 +632,10 @@ export default function App() {
       }
     }, [activities]);
 
-    // SMART FILTER: Padankan dengan Kelab, Sukan ATAU Badan Uniform
     const filtered = useMemo(() => {
       const act = aktiviti?.toUpperCase();
       return students.filter(s => 
-        s.kelab?.toUpperCase() === act || 
-        s.sukan?.toUpperCase() === act || 
-        s.uniform?.toUpperCase() === act
+        s.act1 === act || s.act2 === act || s.act3 === act
       ).sort((a, b) => a.name.localeCompare(b.name));
     }, [students, aktiviti]);
 
@@ -735,9 +718,7 @@ export default function App() {
     if (selected) {
       const act = selected.aktiviti?.toUpperCase();
       const clubStudents = students.filter(s => 
-        s.kelab?.toUpperCase() === act || 
-        s.sukan?.toUpperCase() === act || 
-        s.uniform?.toUpperCase() === act
+        s.act1 === act || s.act2 === act || s.act3 === act
       ).sort((a, b) => a.name.localeCompare(b.name));
 
       return (
@@ -788,9 +769,7 @@ export default function App() {
       if (!club) return [];
       const act = club.toUpperCase();
       const clubStudents = students.filter(s => 
-        s.kelab?.toUpperCase() === act || 
-        s.sukan?.toUpperCase() === act || 
-        s.uniform?.toUpperCase() === act
+        s.act1 === act || s.act2 === act || s.act3 === act
       ).sort((a, b) => a.name.localeCompare(b.name));
       const data = clubStudents.map(s => ({ ...s, sessions: 0, present: 0 }));
       const clubRecords = attendanceRecords.filter(r => r.aktiviti?.toUpperCase() === act);
@@ -878,7 +857,9 @@ export default function App() {
                     <li key={s.id} className="border-b pb-2">
                       <div className="font-bold text-slate-800 text-xs uppercase">{s.name}</div>
                       <div className="text-slate-500 mt-1 flex flex-wrap gap-1">
-                        {s.kelab && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 font-bold rounded">{s.kelab}</span>}
+                        {s.act1 && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 font-bold rounded">{s.act1}</span>}
+                        {s.act2 && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 font-bold rounded">{s.act2}</span>}
+                        {s.act3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 font-bold rounded">{s.act3}</span>}
                       </div>
                     </li>
                   ))}
