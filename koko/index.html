@@ -19,7 +19,24 @@ import {
 } from 'firebase/auth';
 
 // --- CONFIGURATION & INITIALIZATION ---
+
+// 1. UNTUK PENGGUNAAN DI DALAM SISTEM AI INI (CANVAS):
 const firebaseConfig = JSON.parse(__firebase_config);
+
+// 2. NOTA PENTING JIKA CIKGU PINDAHKAN KOD INI KE GITHUB / VERCEL:
+// Padam atau 'comment' baris (1) di atas, dan buang 'comment' pada baris (2) di bawah.
+// Masukkan maklumat Firebase cikgu yang sebenar:
+/*
+const firebaseConfig = {
+  apiKey: "API_KEY_CIKGU",
+  authDomain: "ekoku-skpk.firebaseapp.com",
+  projectId: "ekoku-skpk",
+  storageBucket: "ekoku-skpk.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abcdef"
+};
+*/
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -134,7 +151,7 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // LIVE DATA STATES
+  // LIVE DATA STATES (2-Sheet setup)
   const DEFAULT_MURID_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyXz6iABc4zz0gpRMqo0xgzZtUmw9BSwkrbYq2Mc0c0hcnwg-pZTIm9XE1S2g5B_4wnblhRSAiO28V/pub?gid=0&single=true&output=csv';
   const DEFAULT_GURU_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyXz6iABc4zz0gpRMqo0xgzZtUmw9BSwkrbYq2Mc0c0hcnwg-pZTIm9XE1S2g5B_4wnblhRSAiO28V/pub?gid=33896881&single=true&output=csv';
 
@@ -147,10 +164,14 @@ export default function App() {
 
   useEffect(() => {
     const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        await signInWithCustomToken(auth, __initial_auth_token);
-      } else {
-        await signInAnonymously(auth);
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+           await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+           await signInAnonymously(auth);
+        }
+      } catch (error) {
+        console.error("Firebase Auth Error:", error);
       }
     };
     initAuth();
@@ -199,6 +220,7 @@ export default function App() {
             const act3 = (row[3] || '').trim().toUpperCase(); 
 
             if (name && name.toLowerCase() !== 'nama murid') {
+              // Simpan semua kemungkinan aktiviti untuk sokongan berbilang lajur atau satu lajur
               newStudents.push({ id: `S${i}`, name, act1, act2, act3 });
               if (act1 && act1 !== '-') newActivities.add(act1);
               if (act2 && act2 !== '-') newActivities.add(act2);
