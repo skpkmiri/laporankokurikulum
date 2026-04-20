@@ -1,968 +1,486 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  setDoc, 
-  addDoc, 
-  onSnapshot, 
-  query, 
-  orderBy, 
-  updateDoc 
-} from 'firebase/firestore';
-import { 
-  getAuth, 
-  signInAnonymously, 
-  signInWithCustomToken, 
-  onAuthStateChanged 
-} from 'firebase/auth';
-
-// =====================================================================
-// KONFIGURASI PANGKALAN DATA (FIREBASE)
-// =====================================================================
-
-// (A) JIKA CIKGU GUNA DI DALAM SISTEM AI INI (BIARKAN KOD INI AKTIF)
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-
-// (B) JIKA CIKGU BAWA KOD INI KE STACKBLITZ / GITHUB / VERCEL:
-// Padam kod (A) di atas, dan buang simbol komen /* dan */ di bawah ini.
-// Masukkan maklumat dari console.firebase.google.com cikgu.
-
-/*
-const firebaseConfig = {
-  apiKey: "SILA_MASUKKAN_API_KEY_CIKGU_DI_SINI",
-  authDomain: "ekoku-skpk.firebaseapp.com",
-  projectId: "ekoku-skpk",
-  storageBucket: "ekoku-skpk.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef"
-};
-*/
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'ekoku-skpk-miri';
-
-// --- ICONS ---
-const Icons = {
-  PenTool: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>,
-  Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>,
-  ClipboardList: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>,
-  Archive: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>,
-  PieChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>,
-  Printer: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>,
-  Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
-  X: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
-  Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>,
-  Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 0 20.49 15"></path></svg>
-};
-
-// --- UTILS ---
-const compressImage = (base64Str, maxWidth = 600) => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.src = base64Str;
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const scale = maxWidth / img.width;
-      canvas.width = maxWidth;
-      canvas.height = img.height * scale;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL('image/jpeg', 0.6));
-    };
-  });
-};
-
-const parseCSV = (str) => {
-  if (!str) return [];
-  const arr = [];
-  let quote = false;
-  let row = 0, col = 0, c = 0;
-  for (; c < str.length; c++) {
-    let cc = str[c], nc = str[c+1];
-    arr[row] = arr[row] || [];
-    arr[row][col] = arr[row][col] || '';
-    if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
-    if (cc == '"') { quote = !quote; continue; }
-    if (cc == ',' && !quote) { ++col; continue; }
-    if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
-    if (cc == '\n' && !quote) { ++row; col = 0; continue; }
-    if (cc == '\r' && !quote) { ++row; col = 0; continue; }
-    arr[row][col] += cc;
-  }
-  return arr;
-};
-
-// Fungsi Pintar Mengambil CSV dengan Cache Buster & Pelbagai Laluan Sandaran
-const fetchCSVData = async (rawUrl) => {
-  if (!rawUrl) return null;
-  const url = rawUrl.trim();
-  const cacheBusterUrl = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
-  
-  const proxies = [
-    url, 
-    cacheBusterUrl,
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-    `https://corsproxy.io/?${encodeURIComponent(url)}`
-  ];
-
-  for (let proxy of proxies) {
-    try {
-      const response = await fetch(proxy);
-      if (response.ok) {
-        const text = await response.text();
-        const trimmed = text.trim().toLowerCase();
-        if (text && !trimmed.startsWith('<!doctype') && !trimmed.startsWith('<html')) {
-          return text;
-        }
-      }
-    } catch (err) {
-      console.warn(`Fetch failed for proxy: ${proxy}`);
-    }
-  }
-
-  try {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
-    if (response.ok) {
-      const data = await response.json();
-      if (data && data.contents) {
-        const text = data.contents;
-        const trimmed = text.trim().toLowerCase();
-        if (text && !trimmed.startsWith('<!doctype') && !trimmed.startsWith('<html')) {
-          return text;
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`Final JSON proxy failed`);
-  }
-
-  throw new Error('Semua kaedah muat turun gagal. Sila periksa rangkaian atau tetapan pautan anda.');
-};
-
-// --- MAIN COMPONENT ---
-export default function App() {
-  const [user, setUser] = useState(null);
-  const [currentView, setCurrentView] = useState('laporan_baru');
-  const [reports, setReports] = useState([]);
-  const [attendanceRecords, setAttendanceRecords] = useState([]);
-  const [toastMessage, setToastMessage] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // LIVE DATA STATES (2-Sheet setup)
-  const DEFAULT_MURID_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyXz6iABc4zz0gpRMqo0xgzZtUmw9BSwkrbYq2Mc0c0hcnwg-pZTIm9XE1S2g5B_4wnblhRSAiO28V/pub?gid=0&single=true&output=csv';
-  const DEFAULT_GURU_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyXz6iABc4zz0gpRMqo0xgzZtUmw9BSwkrbYq2Mc0c0hcnwg-pZTIm9XE1S2g5B_4wnblhRSAiO28V/pub?gid=33896881&single=true&output=csv';
-
-  const [csvLinkMurid, setCsvLinkMurid] = useState(DEFAULT_MURID_CSV);
-  const [csvLinkGuru, setCsvLinkGuru] = useState(DEFAULT_GURU_CSV);
-  
-  const [students, setStudents] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [activities, setActivities] = useState(['PILIH AKTIVITI']);
-
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-           await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-           await signInAnonymously(auth);
-        }
-      } catch (error) {
-        console.error("Firebase Auth Error:", error);
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, u => { setUser(u); if (u) setIsLoading(false); });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    const unsubReports = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), orderBy('timestamp', 'desc')), s => {
-      setReports(s.docs.map(d => ({ ...d.data(), id: d.id })));
-    });
-    const unsubAttendance = onSnapshot(query(collection(db, 'artifacts', appId, 'public', 'data', 'attendance'), orderBy('timestamp', 'desc')), s => {
-      setAttendanceRecords(s.docs.map(d => ({ ...d.data(), id: d.id })));
-    });
-    const unsubConfig = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config'), d => {
-      if (d.exists()) {
-        const data = d.data();
-        if (data.csvLinkMurid) setCsvLinkMurid(data.csvLinkMurid);
-        if (data.csvLinkGuru) setCsvLinkGuru(data.csvLinkGuru);
-      }
-    });
-    return () => { unsubReports(); unsubAttendance(); unsubConfig(); };
-  }, [user]);
-
-  // AUTO FETCH GOOGLE SHEETS LIVE DATA (MURID & GURU)
-  useEffect(() => {
-    const fetchLiveCSV = async () => {
-      let newStudents = [];
-      let newTeachers = new Set();
-      let newActivities = new Set();
-      let successMurid = false;
-      let successGuru = false;
-
-      if (csvLinkMurid) {
-        try {
-          const text = await fetchCSVData(csvLinkMurid);
-          const rows = parseCSV(text);
-          for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row || row.length === 0) continue;
-            
-            const name = (row[0] || '').trim();
-            const act1 = (row[1] || '').trim().toUpperCase(); 
-            const act2 = (row[2] || '').trim().toUpperCase(); 
-            const act3 = (row[3] || '').trim().toUpperCase(); 
-
-            if (name && name.toLowerCase() !== 'nama murid') {
-              // Simpan semua kemungkinan aktiviti untuk sokongan berbilang lajur atau satu lajur
-              newStudents.push({ id: `S${i}`, name, act1, act2, act3 });
-              if (act1 && act1 !== '-') newActivities.add(act1);
-              if (act2 && act2 !== '-') newActivities.add(act2);
-              if (act3 && act3 !== '-') newActivities.add(act3);
-            }
-          }
-          successMurid = true;
-        } catch (e) { 
-          console.error('Gagal memuat turun data Murid', e); 
-          setToastMessage('Ralat menarik data Murid. Sila semak pautan / set fail ke Public.');
-          setTimeout(() => setToastMessage(null), 4000);
-        }
-      }
-
-      if (csvLinkGuru) {
-        try {
-          const text = await fetchCSVData(csvLinkGuru);
-          const rows = parseCSV(text);
-          for (let i = 1; i < rows.length; i++) {
-            const row = rows[i];
-            if (!row || row.length === 0) continue;
-            
-            const name = (row[0] || '').trim().toUpperCase();
-            if (name && name.toLowerCase() !== 'nama guru') {
-              newTeachers.add(name);
-            }
-          }
-          successGuru = true;
-        } catch (e) { 
-          console.error('Gagal memuat turun data Guru', e); 
-          setToastMessage('Ralat menarik data Guru. Sila semak pautan / set fail ke Public.');
-          setTimeout(() => setToastMessage(null), 4000);
-        }
-      }
-      
-      if (successMurid) {
-        setStudents(newStudents.sort((a, b) => a.name.localeCompare(b.name)));
-        if (newActivities.size > 0) setActivities(Array.from(newActivities).sort());
-      }
-      if (successGuru && newTeachers.size > 0) {
-        setTeachers(Array.from(newTeachers).sort());
-      }
-    };
-
-    if (csvLinkMurid || csvLinkGuru) {
-      fetchLiveCSV();
-    }
-  }, [csvLinkMurid, csvLinkGuru]);
-
-  const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 3000); };
-
-  const navItems = [
-    { id: 'laporan_baru', label: 'Laporan', icon: Icons.PenTool },
-    { id: 'kehadiran_baru', label: 'Kehadiran', icon: Icons.Users },
-    { id: 'rekod_laporan', label: 'Rekod Laporan', icon: Icons.Archive },
-    { id: 'rekod_kehadiran', label: 'Rekod Kehadiran', icon: Icons.ClipboardList },
-    { id: 'rumusan', label: 'Rumusan', icon: Icons.PieChart },
-    { id: 'tetapan', label: 'Tetapan', icon: Icons.Settings },
-  ];
-
-  const LaporanForm = () => {
-    const [formData, setFormData] = useState({
-      perjumpaan: '1', unit: activities[0] || '', tarikh: '', tajuk: '', aktiviti: '', 
-      laporanMurid: null, rumusan: '', kemahiranBerfikir: '', 
-      kataKerjaKbat: '', ulasanKbat: '', disediakanOleh: '', namaDisediakan: '', 
-      ulasan1: '', ulasan2: '', ulasan3: '', ulasan4: '', ulasan5: '', ulasan6: '',
-      gambar1: null, gambar2: null, gambar3: null, gambar4: null, gambar5: null, gambar6: null
-    });
-
-    useEffect(() => {
-      if (activities.length > 0 && !activities.includes(formData.unit)) {
-        setFormData(prev => ({ ...prev, unit: activities[0] }));
-      }
-    }, [activities]);
-
-    const KEMAHIRAN_BERFIKIR_OPTS = ['', '1. MENGAPLIKASI', '2. MENGANALISIS', '3. MENILAI', '4. MENCIPTA'];
-    const KATA_KERJA_KBAT_OPTS = [
-      '', '1. MENUNJUKKAN', '1. MENGAPLIKASI', '1. MENGGUNA', '1. MELENGKAP', '1. MEMBINA', '1. MENGHASIL',
-      '2. MENGKATEGORI', '2. MENGUJI', '2. MEMBEZAKAN', '2. MEMBANDING', '2. MENTAFSIR',
-      '3. MEMBUAT KEPUTUSAN', '3. MEMILIH', '3. MENENTUKAN', '3. MENCADANG', '3. MEMBAHAS', '3. MENILAI', '3. MEMBERI ALASAN',
-      '4. MENCIPTA', '4. MERANCANG', '4. MENGUBAH', '4. MEREKA BENTUK', '4. MELAKAR', '4. MENGHASILKAN'
-    ];
-
-    const handleFile = async (e, field) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          const compressed = await compressImage(event.target.result);
-          setFormData(prev => ({ ...prev, [field]: compressed }));
-        };
-        reader.readAsDataURL(file);
-      }
-    };
-
-    const handleSubmit = async (e) => {
-      e.preventDefault();
-      if (!user) return;
-      try {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), {
-          ...formData, timestamp: Date.now(), createdBy: user.uid, eSignPenyemak: null
-        });
-        showToast('Laporan berjaya disimpan!');
-        setCurrentView('rekod_laporan');
-      } catch (err) { showToast('Ralat simpan data.'); }
-    };
-
-    const ImageUpload = ({ label, field }) => (
-      <div className="space-y-2">
-        <label className="text-[10px] font-bold text-slate-500 uppercase">{label}</label>
-        {formData[field] ? (
-          <div className="relative group">
-            <img src={formData[field]} className="h-32 w-full object-cover rounded-lg border shadow-sm" alt="Preview" />
-            <button type="button" onClick={() => setFormData({...formData, [field]: null})} className="absolute top-1 right-1 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow-md">X</button>
-          </div>
-        ) : (
-          <label className="flex flex-col items-center justify-center h-24 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 cursor-pointer hover:bg-slate-100 transition">
-            <span className="text-xl">📷</span>
-            <span className="text-[10px] text-slate-400 mt-1 uppercase font-bold">Pilih Gambar</span>
-            <input type="file" accept="image/*" className="hidden" onChange={e => handleFile(e, field)} />
-          </label>
-        )}
-      </div>
-    );
-
-    return (
-      <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-slate-100 print:hidden">
-        <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-          <Icons.PenTool /> Daftar Laporan Mingguan
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Perjumpaan</label>
-              <select className="w-full p-3 border rounded-lg outline-none bg-white" value={formData.perjumpaan} onChange={e => setFormData({...formData, perjumpaan: e.target.value})}>
-                {Array.from({length: 20}, (_, i) => i + 1).map(num => <option key={num} value={num}>{num}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Kelab / Sukan / Badan Uniform</label>
-              <select className="w-full p-3 border rounded-lg outline-none bg-white" value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})}>
-                {activities.map(act => <option key={act} value={act}>{act}</option>)}
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Tarikh*</label>
-              <input type="date" required className="w-full p-3 border rounded-lg outline-none bg-white" value={formData.tarikh} onChange={e => setFormData({...formData, tarikh: e.target.value})} />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Tajuk Aktiviti*</label>
-              <input type="text" required className="w-full p-3 border rounded-lg outline-none bg-white" placeholder="Cth: Latihan Ikatan Buku Sila" value={formData.tajuk} onChange={e => setFormData({...formData, tajuk: e.target.value})} />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Huraian Aktiviti*</label>
-              <textarea rows="4" required className="w-full p-3 border rounded-lg outline-none bg-slate-50 focus:bg-white transition" value={formData.aktiviti} onChange={e => setFormData({...formData, aktiviti: e.target.value})} />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Rumusan / Refleksi*</label>
-              <textarea rows="3" required className="w-full p-3 border rounded-lg outline-none bg-slate-50 focus:bg-white transition" value={formData.rumusan} onChange={e => setFormData({...formData, rumusan: e.target.value})} />
-            </div>
-          </div>
-
-          <ImageUpload label="Laporan Murid (Lampiran)" field="laporanMurid" />
-
-          <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 space-y-4">
-            <h3 className="font-bold text-blue-900 text-xs uppercase tracking-widest">Elemen KBAT</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <select required className="p-3 border rounded-lg bg-white text-sm" value={formData.kemahiranBerfikir} onChange={e => setFormData({...formData, kemahiranBerfikir: e.target.value})}>
-                {KEMAHIRAN_BERFIKIR_OPTS.map(opt => <option key={opt} value={opt}>{opt || 'Sila Pilih Kemahiran'}</option>)}
-              </select>
-              <select required className="p-3 border rounded-lg bg-white text-sm" value={formData.kataKerjaKbat} onChange={e => setFormData({...formData, kataKerjaKbat: e.target.value})}>
-                {KATA_KERJA_KBAT_OPTS.map(opt => <option key={opt} value={opt}>{opt || 'Sila Pilih Kata Kerja'}</option>)}
-              </select>
-            </div>
-            <input type="text" required className="w-full p-3 border rounded-lg bg-white outline-none text-sm" placeholder="Ulasan elemen KBAT..." value={formData.ulasanKbat} onChange={e => setFormData({...formData, ulasanKbat: e.target.value})} />
-          </div>
-
-          <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-6">
-            <h3 className="font-bold text-slate-800 text-xs uppercase tracking-widest">Dokumentasi Bergambar (Maksimum 6)</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5, 6].map(num => (
-                <div key={num} className="bg-white p-3 rounded-xl shadow-sm space-y-3">
-                  <ImageUpload label={`Gambar ${num}`} field={`gambar${num}`} />
-                  <input type="text" className="w-full p-2 border rounded-lg text-[10px] outline-none" placeholder={`Ulasan Gambar ${num}...`} value={formData[`ulasan${num}`]} onChange={e => setFormData({...formData, [`ulasan${num}`]: e.target.value})} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t">
-            <div className="space-y-3">
-              <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Disediakan Oleh</h4>
-              <input type="text" className="w-full p-4 border rounded-xl text-2xl text-blue-900 bg-slate-50 pointer-events-none" style={{fontFamily: "'Brush Script MT', cursive"}} placeholder="Pilih nama di bawah..." value={formData.disediakanOleh} readOnly />
-              <select required className="w-full p-3 border rounded-xl outline-none text-xs font-bold uppercase" 
-                value={formData.namaDisediakan} 
-                onChange={e => setFormData({...formData, namaDisediakan: e.target.value, disediakanOleh: e.target.value})}>
-                <option value="">Sila Pilih Nama Anda (Guru)</option>
-                {teachers.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col justify-center items-center p-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 text-slate-400">
-               <p className="text-[10px] font-bold uppercase tracking-widest mb-2">Disemak Oleh</p>
-               <div className="h-20 w-full border bg-white rounded flex items-center justify-center italic text-[10px]">E-Sign oleh penyemak di bahagian rekod</div>
-            </div>
-          </div>
-
-          <button type="submit" className="w-full py-5 bg-blue-600 text-white font-bold rounded-2xl shadow-xl hover:bg-blue-700 hover:scale-[1.01] transition transform uppercase tracking-widest">Simpan Laporan Mingguan</button>
-        </form>
-      </div>
-    );
-  };
-
-  const RekodLaporan = () => {
-    const [selected, setSelected] = useState(null);
-    const [filterUnit, setFilterUnit] = useState('SEMUA');
-    const [isSigning, setIsSigning] = useState(false);
-    const canvasRef = useRef(null);
-
-    const filteredReports = useMemo(() => {
-      let res = filterUnit === 'SEMUA' ? reports : reports.filter(r => r.unit === filterUnit);
-      return res.sort((a, b) => (a.unit || '').localeCompare(b.unit || '') || b.timestamp - a.timestamp);
-    }, [reports, filterUnit]);
-
-    const startSigning = () => { setIsSigning(true); };
-    const clearSign = () => {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    };
-    const saveSign = async () => {
-      const canvas = canvasRef.current;
-      const signData = canvas.toDataURL();
-      try {
-        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', selected.id), {
-          eSignPenyemak: signData
-        });
-        showToast('E-Tandatangan berjaya disimpan!');
-        setIsSigning(false);
-        setSelected({...selected, eSignPenyemak: signData});
-      } catch (e) { showToast('Gagal simpan e-sign.'); }
-    };
-
-    useEffect(() => {
-      if (!isSigning || !canvasRef.current) return;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      let drawing = false;
-
-      const getPos = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
-      };
-
-      const draw = (e) => {
-        e.preventDefault(); 
-        if (!drawing) return;
-        const pos = getPos(e);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.stroke();
-      };
-
-      const start = (e) => {
-        e.preventDefault();
-        drawing = true;
-        const pos = getPos(e);
-        ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y);
-      };
-
-      const stop = () => drawing = false;
-
-      canvas.addEventListener('mousedown', start);
-      canvas.addEventListener('mousemove', draw);
-      canvas.addEventListener('mouseup', stop);
-      canvas.addEventListener('touchstart', start, { passive: false });
-      canvas.addEventListener('touchmove', draw, { passive: false });
-      canvas.addEventListener('touchend', stop);
-
-      return () => {
-        canvas.removeEventListener('mousedown', start);
-        canvas.removeEventListener('mousemove', draw);
-        canvas.removeEventListener('mouseup', stop);
-        canvas.removeEventListener('touchstart', start);
-        canvas.removeEventListener('touchmove', draw);
-        canvas.removeEventListener('touchend', stop);
-      };
-    }, [isSigning]);
-
-    if (selected) {
-      const ulasanGambar = [1, 2, 3, 4, 5, 6].map(n => ({ pic: selected[`gambar${n}`], text: selected[`ulasan${n}`] })).filter(i => i.pic || i.text);
-
-      return (
-        <div className="max-w-[210mm] mx-auto bg-white p-4 md:p-10 lg:p-12 shadow-2xl border-slate-200 print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none">
-          <div className="flex justify-between items-center mb-6 print:hidden">
-            <button onClick={() => setSelected(null)} className="text-blue-600 font-bold flex items-center gap-1">&larr; KEMBALI</button>
-            <div className="flex gap-2">
-              {!selected.eSignPenyemak && !isSigning && (
-                <button onClick={startSigning} className="bg-orange-500 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase">🖋️ E-Sign Penyemak</button>
-              )}
-              <button onClick={() => window.print()} className="bg-slate-800 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase flex items-center gap-2">
-                <Icons.Printer /> CETAK PDF
-              </button>
-            </div>
-          </div>
-
-          {isSigning && (
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 print:hidden">
-              <div className="bg-white p-6 rounded-2xl w-full max-w-md space-y-4">
-                <h3 className="font-bold uppercase text-xs tracking-widest text-center">Tandatangan Penyemak</h3>
-                <canvas ref={canvasRef} width="400" height="200" className="w-full h-48 border-2 border-slate-200 rounded-lg bg-slate-50 cursor-crosshair touch-none" />
-                <div className="flex gap-2">
-                  <button onClick={() => setIsSigning(false)} className="flex-1 py-2 bg-slate-100 rounded-lg text-xs font-bold">BATAL</button>
-                  <button onClick={clearSign} className="flex-1 py-2 bg-slate-100 rounded-lg text-xs font-bold">PADAM</button>
-                  <button onClick={saveSign} className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold">SIMPAN</button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="print:block">
-            <div className="text-center mb-8 flex flex-col items-center">
-              <img src="logo.png" alt="Logo SKPK MIRI" className="w-24 h-24 object-contain mb-4" />
-              <h1 className="text-2xl font-bold uppercase underline">Laporan {selected.unit}</h1>
-              <p className="text-xl font-bold mt-1">SKPK MIRI</p>
-            </div>
-            
-            <table className="w-full border-collapse border-2 border-slate-800 text-[11px]">
-              <tbody>
-                <tr>
-                  <td className="border-2 border-slate-800 p-2 font-bold w-1/4 bg-slate-100 uppercase">Perjumpaan Ke</td><td className="border-2 border-slate-800 p-2 w-1/4 text-center font-bold text-lg">{selected.perjumpaan}</td>
-                  <td className="border-2 border-slate-800 p-2 font-bold w-1/4 bg-slate-100 uppercase">Tarikh</td><td className="border-2 border-slate-800 p-2 w-1/4 text-center font-bold">{selected.tarikh}</td>
-                </tr>
-                <tr><td className="border-2 border-slate-800 p-2 font-bold bg-slate-100 uppercase">Tajuk Aktiviti</td><td colSpan="3" className="border-2 border-slate-800 p-2 font-bold uppercase">{selected.tajuk}</td></tr>
-                <tr><td className="border-2 border-slate-800 p-2 font-bold bg-slate-100 align-top uppercase">Huraian Aktiviti</td><td colSpan="3" className="border-2 border-slate-800 p-2 min-h-[100px] whitespace-pre-wrap">{selected.aktiviti}</td></tr>
-                <tr><td className="border-2 border-slate-800 p-2 font-bold bg-slate-100 align-top uppercase">Rumusan / Refleksi</td><td colSpan="3" className="border-2 border-slate-800 p-2 min-h-[60px] whitespace-pre-wrap">{selected.rumusan}</td></tr>
-                <tr>
-                  <td className="border-2 border-slate-800 p-2 font-bold bg-slate-100 uppercase">Elemen KBAT</td>
-                  <td colSpan="3" className="border-2 border-slate-800 p-2">
-                    <div className="font-bold underline">{selected.kemahiranBerfikir} &bull; {selected.kataKerjaKbat}</div>
-                    <div className="mt-1 italic">{selected.ulasanKbat}</div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-
-            {selected.laporanMurid && (
-              <div className="mt-6 border-2 border-slate-800 p-2 break-inside-avoid">
-                <h4 className="font-bold uppercase text-[10px] mb-2 bg-slate-100 p-1 border-b-2 border-slate-800">Lampiran Laporan Murid</h4>
-                <img src={selected.laporanMurid} className="max-h-96 mx-auto object-contain" alt="Laporan Murid" />
-              </div>
-            )}
-
-            {ulasanGambar.length > 0 && (
-              <div className="mt-6 space-y-4 break-inside-avoid">
-                <h4 className="font-bold uppercase text-[10px] bg-slate-100 p-1 border-2 border-slate-800">Dokumentasi Bergambar</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  {ulasanGambar.map((item, idx) => (
-                    <div key={idx} className="border-2 border-slate-800 p-2 flex flex-col items-center">
-                      <img src={item.pic} className="w-full h-32 object-cover border border-slate-300" alt={`Gambar ${idx+1}`} />
-                      <p className="mt-2 text-[9px] text-center font-bold uppercase italic">{item.text || 'Tiada Ulasan'}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-16 flex justify-between px-10 break-inside-avoid">
-              <div className="text-center">
-                <p className="text-[10px] uppercase font-bold">Disediakan oleh,</p>
-                <div className="h-16 flex items-center justify-center">
-                   <span className="text-sm font-bold mt-4 mb-2 uppercase text-blue-900" style={{fontFamily: "'Brush Script MT', cursive"}}>{selected.disediakanOleh}</span>
-                </div>
-                <div className="border-t-2 border-slate-800 pt-1 font-bold text-[10px] uppercase min-w-[200px]">{selected.namaDisediakan || 'Guru Penasihat'}</div>
-              </div>
-              <div className="text-center">
-                <p className="text-[10px] uppercase font-bold">Disemak oleh,</p>
-                <div className="h-16 flex items-center justify-center">
-                   {selected.eSignPenyemak ? (
-                     <img src={selected.eSignPenyemak} className="h-16 object-contain" alt="Sign" />
-                   ) : <div className="h-16" />}
-                </div>
-                <div className="border-t-2 border-slate-800 pt-1 font-bold text-[10px] uppercase min-w-[200px]">PENGURUSAN SEKOLAH</div>
-                <p className="text-[9px]">GPK Kokurikulum</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-6 print:hidden">
-        <div className="bg-white p-6 rounded-2xl border shadow-sm">
-          <h2 className="text-2xl font-bold mb-6 flex items-center gap-2"><Icons.Archive /> Rekod Laporan Mingguan</h2>
-          <div className="flex flex-wrap gap-2 p-1 bg-slate-100 rounded-xl mb-8">
-            <button onClick={() => setFilterUnit('SEMUA')} className={`flex-1 py-2 px-4 rounded-lg text-[10px] font-bold transition-all ${filterUnit === 'SEMUA' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-white'}`}>SEMUA</button>
-            {activities.map(unit => (
-              <button key={unit} onClick={() => setFilterUnit(unit)} className={`flex-1 py-2 px-4 rounded-lg text-[10px] font-bold transition-all ${filterUnit === unit ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 hover:bg-white'}`}>{unit}</button>
-            ))}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredReports.map(r => (
-              <div key={r.id} onClick={() => setSelected(r)} className="p-4 border rounded-2xl hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group bg-slate-50/50 hover:bg-white">
-                <div className="text-[10px] font-bold text-blue-600 mb-1">{r.unit} &bull; {r.tarikh}</div>
-                <h3 className="font-bold text-slate-800 group-hover:text-blue-700 leading-tight mb-2">{r.tajuk}</h3>
-                <div className="flex justify-between items-center text-[10px]">
-                  <span className="text-slate-400 uppercase">Oleh: {r.namaDisediakan || 'Guru'}</span>
-                  {r.eSignPenyemak ? <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">SIGNED</span> : <span className="bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-bold">PENDING</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const KehadiranForm = () => {
-    const [tarikh, setTarikh] = useState('');
-    const [aktiviti, setAktiviti] = useState(activities[0] || '');
-    const [kehadiran, setKehadiran] = useState({});
-
-    useEffect(() => {
-      if (activities.length > 0 && !activities.includes(aktiviti)) {
-        setAktiviti(activities[0]);
-      }
-    }, [activities]);
-
-    const filtered = useMemo(() => {
-      const act = aktiviti?.toUpperCase();
-      return students.filter(s => 
-        s.act1 === act || s.act2 === act || s.act3 === act
-      ).sort((a, b) => a.name.localeCompare(b.name));
-    }, [students, aktiviti]);
-
-    useEffect(() => { 
-      const initial = {}; 
-      filtered.forEach(s => initial[s.id] = true); 
-      setKehadiran(initial);
-    }, [filtered]);
-
-    const toggleMurid = (e, id) => {
-      e.preventDefault();
-      setKehadiran(prev => ({...prev, [id]: !prev[id]}));
-    };
-
-    const handleSubmit = async () => {
-      if (!tarikh) { showToast('Pilih tarikh.'); return; }
-      try {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'attendance'), { 
-          tarikh, 
-          aktiviti, 
-          records: kehadiran, 
-          timestamp: Date.now(), 
-          createdBy: user.uid 
-        });
-        showToast('Kehadiran disimpan!'); setCurrentView('rekod_kehadiran');
-      } catch (e) { showToast('Gagal simpan.'); }
-    };
-
-    return (
-      <div className="bg-white p-6 rounded-2xl border shadow-sm">
-        <h2 className="text-2xl font-bold mb-6">Kehadiran</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Tarikh*</label>
-            <input type="date" className="w-full p-3 border rounded-xl" value={tarikh} onChange={e => setTarikh(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Kelab / Sukan / Badan Uniform*</label>
-            <select className="w-full p-3 border rounded-xl bg-slate-50 font-bold" value={aktiviti} onChange={e => setAktiviti(e.target.value)}>
-              {activities.map(a => <option key={a} value={a}>{a}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div className="border rounded-xl overflow-hidden">
-          <h3 className="p-4 bg-slate-50 border-b text-xs font-bold text-slate-500 uppercase tracking-widest">Kehadiran Murid ({filtered.length})</h3>
-          {filtered.length === 0 ? (
-            <div className="p-8 text-center text-slate-400 text-sm italic">Tiada nama murid dijumpai untuk {aktiviti}.</div>
-          ) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-50 border-b"><tr><th className="p-4 text-center w-16">Bil</th><th className="p-4">Nama</th><th className="p-4 text-center">Status</th></tr></thead>
-              <tbody>
-                {filtered.map((s, idx) => (
-                  <tr key={s.id} className="border-b hover:bg-slate-50 cursor-pointer select-none" onClick={(e) => toggleMurid(e, s.id)}>
-                    <td className="p-4 text-center font-bold text-slate-400">{idx + 1}</td>
-                    <td className="p-4 font-bold text-slate-700">{s.name}</td>
-                    <td className="p-4">
-                      <div className={`w-8 h-8 rounded-full mx-auto flex items-center justify-center ${kehadiran[s.id] ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
-                        {kehadiran[s.id] ? <Icons.Check /> : <Icons.X />}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-        <button onClick={handleSubmit} disabled={filtered.length === 0} className="mt-8 w-full py-4 bg-blue-600 text-white font-bold rounded-2xl uppercase tracking-widest shadow-lg disabled:opacity-50">Simpan Kehadiran</button>
-      </div>
-    );
-  };
-
-  const RekodKehadiran = () => {
-    const [selected, setSelected] = useState(null);
-
-    const sortedRecords = useMemo(() => {
-      return [...attendanceRecords].sort((a, b) => (a.aktiviti || '').localeCompare(b.aktiviti || '') || b.timestamp - a.timestamp);
-    }, [attendanceRecords]);
-
-    if (selected) {
-      const act = selected.aktiviti?.toUpperCase();
-      const clubStudents = students.filter(s => 
-        s.act1 === act || s.act2 === act || s.act3 === act
-      ).sort((a, b) => a.name.localeCompare(b.name));
-
-      return (
-        <div className="max-w-[210mm] mx-auto bg-white p-4 md:p-10 lg:p-12 shadow-2xl border-slate-200 print:shadow-none print:border-none print:p-0 print:w-full print:max-w-none">
-          <button onClick={() => setSelected(null)} className="mb-4 text-blue-600 font-bold print:hidden">&larr; KEMBALI</button>
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold uppercase underline">Laporan Kehadiran</h1>
-            <p className="font-bold text-lg mt-2">{selected.aktiviti} &bull; {selected.tarikh}</p>
-          </div>
-
-          <table className="w-full border-collapse border-2 border-slate-800 text-sm">
-            <thead><tr className="bg-slate-100"><th className="border-2 border-slate-800 p-2">Bil</th><th className="border-2 border-slate-800 p-2 text-left">Nama Murid</th><th className="border-2 border-slate-800 p-2">Status</th></tr></thead>
-            <tbody>
-              {clubStudents.map((s, idx) => (
-                <tr key={s.id}><td className="border-2 border-slate-800 p-2 text-center">{idx + 1}</td><td className="border-2 border-slate-800 p-2 font-bold uppercase">{s.name}</td><td className={`border-2 border-slate-800 p-2 text-center font-bold ${selected.records[s.id] ? 'text-green-600' : 'text-red-600'}`}>{selected.records[s.id] ? 'HADIR' : 'TH'}</td></tr>
-              ))}
-            </tbody>
-          </table>
-          <button onClick={() => window.print()} className="mt-8 bg-slate-800 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 mx-auto print:hidden uppercase"><Icons.Printer /> CETAK</button>
-        </div>
-      );
-    }
-    return (
-      <div className="bg-white p-6 rounded-2xl border shadow-sm print:hidden">
-        <h2 className="text-2xl font-bold mb-6">Rekod Kehadiran</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {sortedRecords.map(r => (
-            <div key={r.id} onClick={() => setSelected(r)} className="p-4 border rounded-2xl hover:border-green-500 cursor-pointer flex justify-between items-center group bg-slate-50 hover:bg-white">
-              <div><h3 className="font-bold group-hover:text-green-700">{r.aktiviti}</h3><p className="text-xs text-slate-400">{r.tarikh}</p></div>
-              <div className="text-green-600"><Icons.ClipboardList /></div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const RumusanKehadiran = () => {
-    const [club, setClub] = useState(activities[0] || '');
-    
-    useEffect(() => {
-      if (activities.length > 0 && !activities.includes(club)) {
-        setClub(activities[0]);
-      }
-    }, [activities]);
-
-    const summary = useMemo(() => {
-      if (!club) return [];
-      const act = club.toUpperCase();
-      const clubStudents = students.filter(s => 
-        s.act1 === act || s.act2 === act || s.act3 === act
-      ).sort((a, b) => a.name.localeCompare(b.name));
-      const data = clubStudents.map(s => ({ ...s, sessions: 0, present: 0 }));
-      const clubRecords = attendanceRecords.filter(r => r.aktiviti?.toUpperCase() === act);
-      clubRecords.forEach(rec => { data.forEach(s => { s.sessions++; if (rec.records[s.id]) s.present++; }); });
-      return data;
-    }, [attendanceRecords, students, club]);
-
-    return (
-      <div className="bg-white p-6 rounded-2xl border shadow-sm">
-        <h2 className="text-2xl font-bold mb-4">Rumusan Kehadiran</h2>
-        <div className="mb-6 w-full md:w-1/2">
-           <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Kelab / Sukan / Badan Uniform</label>
-           <select className="w-full p-3 border rounded-xl bg-slate-50 font-bold print:hidden" value={club} onChange={e => setClub(e.target.value)}>
-             {activities.map(a => <option key={a} value={a}>{a}</option>)}
-           </select>
-        </div>
-        <div className="overflow-x-auto">
-          {summary.length === 0 ? (
-            <div className="text-center py-10 bg-slate-50 text-slate-400 italic rounded-xl border border-dashed">Tiada rekod untuk dipaparkan.</div>
-          ) : (
-            <table className="w-full border-collapse border-2 border-slate-800 text-sm">
-              <thead className="bg-slate-100"><tr><th className="border-2 border-slate-800 p-2">Bil</th><th className="border-2 border-slate-800 p-2 text-left">Nama Murid</th><th className="border-2 border-slate-800 p-2 text-center">Hadir/Sesi</th><th className="border-2 border-slate-800 p-2 text-center">%</th></tr></thead>
-              <tbody>
-                {summary.map((s, idx) => {
-                  const perc = s.sessions === 0 ? 0 : Math.round((s.present/s.sessions)*100);
-                  return (
-                    <tr key={s.id}><td className="border-2 border-slate-800 p-2 text-center">{idx + 1}</td><td className="border-2 border-slate-800 p-2 font-bold uppercase">{s.name}</td><td className="border-2 border-slate-800 p-2 text-center font-bold text-slate-600">{s.present}/{s.sessions}</td><td className="border-2 border-slate-800 p-2 text-center"><span className={`px-2 py-1 rounded-full font-bold text-[10px] ${perc >= 80 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{perc}%</span></td></tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const TetapanData = () => {
-    const [inputLinkMurid, setInputLinkMurid] = useState(csvLinkMurid);
-    const [inputLinkGuru, setInputLinkGuru] = useState(csvLinkGuru);
-    const [status, setStatus] = useState('');
-    
-    const handleSaveLink = async () => {
-      setStatus('Menyimpan pautan...');
-      try {
-        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config'), { 
-          csvLinkMurid: inputLinkMurid,
-          csvLinkGuru: inputLinkGuru
-        });
-        showToast('Pautan berjaya dikemaskini. Data akan ditarik secara automatik.');
-        setStatus('');
-      } catch (e) { setStatus('Ralat menyimpan pautan.'); }
-    };
-
-    return (
-      <div className="bg-white p-6 border rounded-2xl shadow-sm">
-        <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Icons.Settings /> Tetapan Data Hidup (Live Data)</h2>
-        
-        <div className="bg-blue-50 p-6 rounded-2xl mb-6 text-xs text-blue-800 border border-blue-100">
-          <strong>Sistem Data Hidup (Auto-Sync):</strong><br/>
-          Aplikasi ini memuat turun data terus dari Google Sheets cikgu secara automatik. Cikgu hanya perlu masukkan link <strong>SEKALI SAHAJA</strong>.<br/><br/>
-          <strong>Format Sheet Murid (Sheet 1):</strong> Lajur A (Nama Murid), Lajur B (Kelab / Sukan / Uniform)<br/>
-          <strong>Format Sheet Guru (Sheet 2):</strong> Lajur A (Nama Guru)
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 mb-6">
-          <div className="bg-slate-50 p-4 border rounded-xl">
-             <label className="font-bold text-[10px] uppercase tracking-widest text-slate-500 mb-2 block">Pautan CSV Sheet 1 (Murid & Aktiviti)</label>
-             <input className="w-full p-3 border rounded-lg outline-none text-xs" placeholder="Paste link CSV Murid di sini..." value={inputLinkMurid} onChange={e => setInputLinkMurid(e.target.value)} />
-          </div>
-          <div className="bg-slate-50 p-4 border rounded-xl">
-             <label className="font-bold text-[10px] uppercase tracking-widest text-slate-500 mb-2 block">Pautan CSV Sheet 2 (Guru)</label>
-             <input className="w-full p-3 border rounded-lg outline-none text-xs" placeholder="Paste link CSV Guru di sini..." value={inputLinkGuru} onChange={e => setInputLinkGuru(e.target.value)} />
-          </div>
-          <button onClick={handleSaveLink} className="py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-slate-800 transition uppercase tracking-widest"><Icons.Refresh /> {status || 'Simpan Pautan & Muat Turun'}</button>
-        </div>
-        
-        <div className="mt-8 border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="font-bold text-slate-700 text-xs mb-3 uppercase tracking-widest">Senarai Murid Ditemui ({students.length})</h3>
-            <div className="max-h-60 overflow-y-auto border rounded-xl bg-slate-50 p-3">
-              {students.length > 0 ? (
-                <ul className="space-y-2 text-[10px]">
-                  {students.slice(0, 50).map(s => (
-                    <li key={s.id} className="border-b pb-2">
-                      <div className="font-bold text-slate-800 text-xs uppercase">{s.name}</div>
-                      <div className="text-slate-500 mt-1 flex flex-wrap gap-1">
-                        {s.act1 && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 font-bold rounded">{s.act1}</span>}
-                        {s.act2 && <span className="bg-orange-100 text-orange-700 px-2 py-0.5 font-bold rounded">{s.act2}</span>}
-                        {s.act3 && <span className="bg-green-100 text-green-700 px-2 py-0.5 font-bold rounded">{s.act3}</span>}
-                      </div>
-                    </li>
-                  ))}
-                  {students.length > 50 && <li className="text-slate-400 italic pt-2">Menunjukkan 50 yang pertama...</li>}
-                </ul>
-              ) : (
-                <p className="text-slate-400 italic text-[10px]">Tiada rekod murid. Sila semak pautan CSV Murid.</p>
-              )}
-            </div>
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-700 text-xs mb-3 uppercase tracking-widest">Senarai Guru Ditemui ({teachers.length})</h3>
-            <div className="max-h-60 overflow-y-auto border rounded-xl bg-slate-50 p-3">
-              {teachers.length > 0 ? (
-                <ul className="space-y-1 text-[10px]">
-                  {teachers.map(t => (
-                    <li key={t} className="border-b pb-1 font-bold text-slate-800 truncate uppercase">{t}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-slate-400 italic text-[10px]">Tiada rekod guru. Sila semak pautan CSV Guru.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  if (isLoading) return <div className="h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-bold animate-pulse tracking-widest"><div className="text-4xl mb-4">🚀</div>MEMUAT eKOKU CLOUD...</div>;
-
-  return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-800">
-      {toastMessage && <div className="fixed top-4 right-4 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl z-50 font-bold text-xs">{toastMessage}</div>}
-      
-      <header className="w-full bg-slate-900 text-slate-300 print:hidden sticky top-0 z-20 shadow-xl border-b border-slate-800">
-        <div className="px-6 py-4 flex justify-between items-center">
-          <div className="flex flex-col">
-            <h1 className="text-xl font-black text-white flex items-center gap-2">
-              <span className="bg-blue-600 p-1.5 rounded-lg"><Icons.Archive /></span> eKOKU <span className="text-[10px] bg-white/10 px-2 rounded-full border border-white/20">LIVE</span>
-            </h1>
-            <p className="text-[10px] opacity-50 tracking-widest font-bold">SKPK MIRI</p>
-          </div>
-          <div className="text-[10px] font-bold bg-green-500/20 text-green-400 px-3 py-1 rounded-full border border-green-500/30 flex items-center gap-1">
-             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> LIVE SYNC
-          </div>
-        </div>
-        <nav className="p-2 grid grid-cols-3 md:grid-cols-6 gap-2 bg-slate-800/50 backdrop-blur-md">
-          {navItems.map(item => (
-            <button key={item.id} onClick={() => setCurrentView(item.id)} className={`flex flex-col items-center p-3 rounded-2xl transition-all ${currentView === item.id ? 'bg-blue-600 text-white shadow-xl scale-95' : 'bg-slate-700/50 hover:bg-slate-600 text-slate-400'}`}>
-              <item.icon /><span className="text-[9px] mt-1.5 font-black uppercase tracking-tighter">{item.label}</span>
-            </button>
-          ))}
-        </nav>
-      </header>
-
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto print:p-0">
-        <div className="max-w-5xl mx-auto">
-          {currentView === 'laporan_baru' && <LaporanForm />}
-          {currentView === 'kehadiran_baru' && <KehadiranForm />}
-          {currentView === 'rekod_laporan' && <RekodLaporan />}
-          {currentView === 'rekod_kehadiran' && <RekodKehadiran />}
-          {currentView === 'rumusan' && <RumusanKehadiran />}
-          {currentView === 'tetapan' && <TetapanData />}
-        </div>
-      </main>
-
-      <style>{`
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi eKoku SKPK Miri</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel untuk terjemah JSX dalam Browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
         @media print { 
-          .print\\:hidden { display: none !important; } 
-          body { background: white !important; padding: 0 !important; margin: 0 !important; } 
-          @page { size: A4 portrait; margin: 10mm; }
-          .break-inside-avoid { page-break-inside: avoid; }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            .print\:hidden { display: none !important; } 
+            body { background: white !important; padding: 0 !important; margin: 0 !important; } 
+            @page { size: A4 portrait; margin: 10mm; }
+            .break-inside-avoid { page-break-inside: avoid; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
         }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #64748b; border-radius: 10px; }
-      `}</style>
-    </div>
-  );
-}
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js';
+        import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot, query, orderBy, updateDoc } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js';
+
+        const { useState, useMemo, useEffect, useRef } = React;
+
+        // =====================================================================
+        // KONFIGURASI PANGKALAN DATA FIREBASE (RASMI SKPK MIRI)
+        // =====================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyDXh_xTy18MAeWNex2pAbxIU1GmPKFo2pg",
+            authDomain: "ekoku-skpk-miri.firebaseapp.com",
+            projectId: "ekoku-skpk-miri",
+            storageBucket: "ekoku-skpk-miri.firebasestorage.app",
+            messagingSenderId: "207059132138",
+            appId: "1:207059132138:web:a36f8d2ce00d91806bc193",
+            measurementId: "G-4FYQE25KRK"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = 'ekoku-skpk-miri';
+
+        // --- ICONS ---
+        const Icons = {
+            PenTool: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>,
+            Users: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>,
+            ClipboardList: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>,
+            Archive: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>,
+            PieChart: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>,
+            Printer: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>,
+            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
+            X: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+            Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>,
+            Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 0 20.49 15"></path></svg>
+        };
+
+        // --- UTILS ---
+        const compressImage = (base64Str, maxWidth = 600) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = base64Str;
+                img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const scale = maxWidth / img.width;
+                canvas.width = maxWidth;
+                canvas.height = img.height * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                resolve(canvas.toDataURL('image/jpeg', 0.6));
+                };
+            });
+        };
+
+        const parseCSV = (str) => {
+            if (!str) return [];
+            const arr = [];
+            let quote = false;
+            let row = 0, col = 0, c = 0;
+            for (; c < str.length; c++) {
+                let cc = str[c], nc = str[c+1];
+                arr[row] = arr[row] || [];
+                arr[row][col] = arr[row][col] || '';
+                if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+                if (cc == '"') { quote = !quote; continue; }
+                if (cc == ',' && !quote) { ++col; continue; }
+                if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+                if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+                if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+                arr[row][col] += cc;
+            }
+            return arr;
+        };
+
+        const fetchCSVData = async (rawUrl) => {
+            if (!rawUrl) return null;
+            const url = rawUrl.trim();
+            const cacheBusterUrl = url.includes('?') ? `${url}&_t=${Date.now()}` : `${url}?_t=${Date.now()}`;
+            
+            const proxies = [
+                `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+                cacheBusterUrl,
+                url
+            ];
+
+            for (let proxy of proxies) {
+                try {
+                const response = await fetch(proxy);
+                if (response.ok) {
+                    const text = await response.text();
+                    const trimmed = text.trim().toLowerCase();
+                    if (text && !trimmed.startsWith('<!doctype') && !trimmed.startsWith('<html')) {
+                    return text;
+                    }
+                }
+                } catch (err) {
+                console.warn(`Fetch failed for proxy: ${proxy}`);
+                }
+            }
+            throw new Error('Gagal muat turun data Google Sheets. Sila semak pautan anda.');
+        };
+
+        // --- MAIN COMPONENT ---
+        function App() {
+            const [user, setUser] = useState(null);
+            const [currentView, setCurrentView] = useState('laporan_baru');
+            const [toastMessage, setToastMessage] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+
+            const [reports, setReports] = useState([]);
+            const [attendanceRecords, setAttendanceRecords] = useState([]);
+
+            const DEFAULT_MURID_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyXz6iABc4zz0gpRMqo0xgzZtUmw9BSwkrbYq2Mc0c0hcnwg-pZTIm9XE1S2g5B_4wnblhRSAiO28V/pub?gid=0&single=true&output=csv';
+            const DEFAULT_GURU_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRyXz6iABc4zz0gpRMqo0xgzZtUmw9BSwkrbYq2Mc0c0hcnwg-pZTIm9XE1S2g5B_4wnblhRSAiO28V/pub?gid=33896881&single=true&output=csv';
+
+            const [csvLinkMurid, setCsvLinkMurid] = useState(DEFAULT_MURID_CSV);
+            const [csvLinkGuru, setCsvLinkGuru] = useState(DEFAULT_GURU_CSV);
+            
+            const [students, setStudents] = useState([]);
+            const [teachers, setTeachers] = useState([]);
+            const [activities, setActivities] = useState(['PILIH AKTIVITI']);
+
+            useEffect(() => {
+                const initAuth = async () => {
+                try {
+                    await signInAnonymously(auth);
+                } catch (error) {
+                    console.error("Auth Error:", error);
+                    setToastMessage("Ralat: Sila aktifkan 'Anonymous Sign-in' di Firebase Console.");
+                }
+                };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, u => { setUser(u); if (u) setIsLoading(false); });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const unsubReports = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), s => {
+                    setReports(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => b.timestamp - a.timestamp));
+                });
+                const unsubAttendance = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'attendance'), s => {
+                    setAttendanceRecords(s.docs.map(d => ({ ...d.data(), id: d.id })).sort((a,b) => b.timestamp - a.timestamp));
+                });
+                const unsubConfig = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config'), d => {
+                    if (d.exists()) {
+                        const data = d.data();
+                        if (data.csvLinkMurid) setCsvLinkMurid(data.csvLinkMurid);
+                        if (data.csvLinkGuru) setCsvLinkGuru(data.csvLinkGuru);
+                    }
+                });
+                return () => { unsubReports(); unsubAttendance(); unsubConfig(); };
+            }, [user]);
+
+            useEffect(() => {
+                const fetchLiveCSV = async () => {
+                    let newStudents = [];
+                    let newTeachers = new Set();
+                    let newActivities = new Set();
+                    if (csvLinkMurid) {
+                        try {
+                            const text = await fetchCSVData(csvLinkMurid);
+                            const rows = parseCSV(text);
+                            for (let i = 1; i < rows.length; i++) {
+                                const row = rows[i];
+                                if (!row || row.length < 2) continue;
+                                const name = (row[0] || '').trim();
+                                const act1 = (row[1] || '').trim().toUpperCase();
+                                const act2 = (row[2] || '').trim().toUpperCase();
+                                const act3 = (row[3] || '').trim().toUpperCase();
+                                if (name && name.toLowerCase() !== 'nama murid') {
+                                    newStudents.push({ id: `S${i}`, name, act1, act2, act3 });
+                                    if (act1 && act1 !== '-') newActivities.add(act1);
+                                    if (act2 && act2 !== '-') newActivities.add(act2);
+                                    if (act3 && act3 !== '-') newActivities.add(act3);
+                                }
+                            }
+                            setStudents(newStudents.sort((a,b) => a.name.localeCompare(b.name)));
+                            if (newActivities.size > 0) setActivities(Array.from(newActivities).sort());
+                        } catch (e) { console.error(e); }
+                    }
+                    if (csvLinkGuru) {
+                        try {
+                            const text = await fetchCSVData(csvLinkGuru);
+                            const rows = parseCSV(text);
+                            for (let i = 1; i < rows.length; i++) {
+                                const name = (rows[i]?.[0] || '').trim().toUpperCase();
+                                if (name && name !== 'NAMA GURU') newTeachers.add(name);
+                            }
+                            setTeachers(Array.from(newTeachers).sort());
+                        } catch (e) { console.error(e); }
+                    }
+                };
+                fetchLiveCSV();
+            }, [csvLinkMurid, csvLinkGuru]);
+
+            const showToast = (msg) => { setToastMessage(msg); setTimeout(() => setToastMessage(null), 3000); };
+
+            const LaporanForm = () => {
+                const [formData, setFormData] = useState({
+                    perjumpaan: '1', unit: activities[0] || '', tarikh: '', tajuk: '', aktiviti: '', 
+                    laporanMurid: null, rumusan: '', kemahiranBerfikir: '', 
+                    kataKerjaKbat: '', ulasanKbat: '', disediakanOleh: '', namaDisediakan: '', 
+                    ulasan1: '', ulasan2: '', ulasan3: '', ulasan4: '', ulasan5: '', ulasan6: '',
+                    gambar1: null, gambar2: null, gambar3: null, gambar4: null, gambar5: null, gambar6: null
+                });
+
+                const handleSubmit = async (e) => {
+                    e.preventDefault();
+                    if (!user) return;
+                    try {
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), {
+                            ...formData, timestamp: Date.now(), createdBy: user.uid, eSignPenyemak: null
+                        });
+                        showToast('Laporan berjaya disimpan!');
+                        setCurrentView('rekod_laporan');
+                    } catch (err) { showToast('Ralat simpan data.'); }
+                };
+
+                const handleFile = async (e, field) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = async (event) => {
+                            const compressed = await compressImage(event.target.result);
+                            setFormData(prev => ({ ...prev, [field]: compressed }));
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+
+                return (
+                    <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-slate-100">
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Icons.PenTool /> Daftar Laporan Mingguan</h2>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Unit Kokurikulum</label>
+                                    <select className="w-full p-3 border rounded-lg bg-white" value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})}>
+                                        {activities.map(act => <option key={act} value={act}>{act}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Tarikh</label>
+                                    <input type="date" required className="w-full p-3 border rounded-lg bg-white" value={formData.tarikh} onChange={e => setFormData({...formData, tarikh: e.target.value})} />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Tajuk Aktiviti</label>
+                                    <input type="text" required className="w-full p-3 border rounded-lg bg-white" value={formData.tajuk} onChange={e => setFormData({...formData, tajuk: e.target.value})} />
+                                </div>
+                            </div>
+                            <textarea placeholder="Huraian Aktiviti..." required className="w-full p-3 border rounded-xl h-32" value={formData.aktiviti} onChange={e=>setFormData({...formData, aktiviti: e.target.value})} />
+                            <textarea placeholder="Rumusan / Refleksi..." required className="w-full p-3 border rounded-xl h-24" value={formData.rumusan} onChange={e=>setFormData({...formData, rumusan: e.target.value})} />
+                            
+                            <div className="bg-slate-50 p-4 rounded-xl">
+                                <h3 className="text-xs font-bold mb-4 uppercase">Pilih Gambar (Maks 6)</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {[1,2,3,4,5,6].map(n => (
+                                        <div key={n} className="flex flex-col gap-1">
+                                            {formData[`gambar${n}`] ? <img src={formData[`gambar${n}`]} className="h-20 object-cover rounded" /> : 
+                                            <input type="file" accept="image/*" onChange={e => handleFile(e, `gambar${n}`)} className="text-[10px]" />}
+                                            <input type="text" placeholder="Ulasan..." className="p-1 border rounded text-[10px]" value={formData[`ulasan${n}`]} onChange={e=>setFormData({...formData, [`ulasan${n}`]: e.target.value})} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-widest">Disediakan Oleh (Nama Guru)</label>
+                                <select required className="w-full p-3 border rounded-xl bg-slate-50 font-bold uppercase text-xs" value={formData.namaDisediakan} onChange={e => setFormData({...formData, namaDisediakan: e.target.value, disediakanOleh: e.target.value})}>
+                                    <option value="">SILA PILIH NAMA</option>
+                                    {teachers.map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                            </div>
+
+                            <button type="submit" className="w-full py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg hover:bg-blue-700 transition uppercase tracking-widest">Simpan Laporan</button>
+                        </form>
+                    </div>
+                );
+            };
+
+            const RekodLaporan = () => {
+                const [selected, setSelected] = useState(null);
+                const [isSigning, setIsSigning] = useState(false);
+                const canvasRef = useRef(null);
+
+                const saveSign = async () => {
+                    const signData = canvasRef.current.toDataURL();
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', selected.id), { eSignPenyemak: signData });
+                    setSelected({...selected, eSignPenyemak: signData});
+                    setIsSigning(false);
+                    showToast('Disemak!');
+                };
+
+                if (selected) return (
+                    <div className="bg-white p-8 rounded-2xl border shadow-xl relative">
+                        <button onClick={()=>setSelected(null)} className="mb-4 text-blue-600 font-bold print:hidden">&larr; KEMBALI</button>
+                        <div className="text-center mb-6">
+                            <h1 className="text-2xl font-bold uppercase underline">Laporan {selected.unit}</h1>
+                            <p className="font-bold">TARIKH: {selected.tarikh}</p>
+                        </div>
+                        <div className="space-y-4 text-sm border-2 border-black p-4">
+                            <p><strong>TAJUK:</strong> {selected.tajuk}</p>
+                            <p><strong>AKTIVITI:</strong> {selected.aktiviti}</p>
+                            <p><strong>RUMUSAN:</strong> {selected.rumusan}</p>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
+                            {[1,2,3,4,5,6].map(n => selected[`gambar${n}`] && (
+                                <div key={n} className="border p-2 text-center">
+                                    <img src={selected[`gambar${n}`]} className="h-32 mx-auto object-cover mb-1" />
+                                    <p className="text-[10px] italic">{selected[`ulasan${n}`]}</p>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-12 flex justify-between px-10">
+                            <div className="text-center">
+                                <p className="text-xs uppercase font-bold">Disediakan oleh,</p>
+                                <p className="mt-8 font-bold border-t-2 border-black pt-1">{selected.namaDisediakan}</p>
+                            </div>
+                            <div className="text-center">
+                                <p className="text-xs uppercase font-bold">Disemak oleh,</p>
+                                {selected.eSignPenyemak ? <img src={selected.eSignPenyemak} className="h-12 mx-auto" /> : 
+                                <button onClick={()=>setIsSigning(true)} className="mt-2 bg-orange-500 text-white px-2 py-1 text-[10px] rounded print:hidden">Klik untuk E-Sign</button>}
+                                <p className="mt-2 font-bold border-t-2 border-black pt-1">PENGURUSAN SEKOLAH</p>
+                            </div>
+                        </div>
+                        <button onClick={()=>window.print()} className="mt-8 w-full py-2 bg-slate-800 text-white rounded font-bold print:hidden uppercase tracking-widest">Cetak PDF</button>
+                        
+                        {isSigning && (
+                            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white p-6 rounded-xl w-full max-w-sm">
+                                    <h3 className="font-bold mb-4">Tandatangan Penyemak</h3>
+                                    <canvas ref={canvasRef} width="300" height="150" className="border-2 border-dashed bg-slate-50 w-full" />
+                                    <div className="flex gap-2 mt-4">
+                                        <button onClick={()=>setIsSigning(false)} className="flex-1 py-2 border rounded">Batal</button>
+                                        <button onClick={saveSign} className="flex-1 py-2 bg-blue-600 text-white rounded">Simpan</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+
+                return (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {reports.map(r => (
+                            <div key={r.id} onClick={()=>setSelected(r)} className="p-4 bg-white border rounded-xl cursor-pointer hover:border-blue-500 transition shadow-sm">
+                                <div className="text-[10px] font-bold text-blue-600">{r.unit} • {r.tarikh}</div>
+                                <div className="font-bold text-slate-800 uppercase">{r.tajuk}</div>
+                                <div className="text-[10px] text-slate-400 mt-2">Oleh: {r.namaDisediakan}</div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            };
+
+            const KehadiranForm = () => {
+                const [tarikh, setTarikh] = useState('');
+                const [aktiviti, setAktiviti] = useState(activities[0] || '');
+                const [kehadiran, setKehadiran] = useState({});
+
+                const filtered = useMemo(() => {
+                    const act = aktiviti?.toUpperCase();
+                    return students.filter(s => s.act1 === act || s.act2 === act || s.act3 === act);
+                }, [students, aktiviti]);
+
+                useEffect(() => { 
+                    const initial = {}; 
+                    filtered.forEach(s => initial[s.id] = true); 
+                    setKehadiran(initial);
+                }, [filtered]);
+
+                const handleSubmit = async () => {
+                    if (!tarikh) return showToast('Pilih tarikh.');
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'attendance'), { 
+                        tarikh, aktiviti, records: kehadiran, timestamp: Date.now(), createdBy: user.uid 
+                    });
+                    showToast('Berjaya!'); setCurrentView('rekod_kehadiran');
+                };
+
+                return (
+                    <div className="bg-white p-6 rounded-2xl border shadow-sm">
+                        <h2 className="text-xl font-bold mb-6">Ambil Kehadiran</h2>
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <input type="date" className="p-3 border rounded-xl" value={tarikh} onChange={e=>setTarikh(e.target.value)} />
+                            <select className="p-3 border rounded-xl bg-slate-50 font-bold" value={aktiviti} onChange={e=>setAktiviti(e.target.value)}>
+                                {activities.map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            {filtered.map(s => (
+                                <div key={s.id} onClick={()=>setKehadiran({...kehadiran, [s.id]: !kehadiran[s.id]})} className={`p-4 border rounded-xl flex justify-between items-center cursor-pointer transition ${kehadiran[s.id] ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                    <span className="font-bold uppercase text-xs">{s.name}</span>
+                                    {kehadiran[s.id] ? <span className="bg-green-500 text-white px-2 py-1 rounded text-[10px]">HADIR</span> : <span className="bg-red-500 text-white px-2 py-1 rounded text-[10px]">TH</span>}
+                                </div>
+                            ))}
+                        </div>
+                        <button onClick={handleSubmit} className="mt-8 w-full py-4 bg-blue-600 text-white font-bold rounded-xl shadow-lg uppercase tracking-widest">Simpan Kehadiran</button>
+                    </div>
+                );
+            };
+
+            const TetapanData = () => {
+                const [links, setLinks] = useState({ murid: csvLinkMurid, guru: csvLinkGuru });
+                const handleSave = async () => {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config'), { csvLinkMurid: links.murid, csvLinkGuru: links.guru });
+                    showToast('Tetapan dikemaskini!');
+                };
+                return (
+                    <div className="bg-white p-6 border rounded-2xl shadow-sm space-y-6">
+                        <h2 className="text-xl font-bold">Tetapan Pautan Google Sheets</h2>
+                        <input className="w-full p-3 border rounded-xl text-xs" placeholder="Pautan CSV Murid..." value={links.murid} onChange={e=>setLinks({...links, murid: e.target.value})} />
+                        <input className="w-full p-3 border rounded-xl text-xs" placeholder="Pautan CSV Guru..." value={links.guru} onChange={e=>setLinks({...links, guru: e.target.value})} />
+                        <button onClick={handleSave} className="w-full py-4 bg-slate-900 text-white rounded-xl font-bold uppercase tracking-widest">Simpan & Kemaskini Data</button>
+                    </div>
+                );
+            };
+
+            if (isLoading) return <div className="h-screen flex flex-col items-center justify-center bg-slate-900 text-white font-bold animate-pulse tracking-widest"><div className="text-4xl mb-4">🚀</div>MEMUAT eKOKU LIVE...</div>;
+
+            return (
+                <div className="min-h-screen bg-slate-50 flex flex-col">
+                    {toastMessage && <div className="fixed top-4 right-4 bg-slate-800 text-white px-6 py-3 rounded-xl shadow-2xl z-50 font-bold text-xs">{toastMessage}</div>}
+                    <header className="bg-slate-900 text-white print:hidden">
+                        <div className="px-6 py-4 flex justify-between items-center border-b border-slate-800">
+                            <div>
+                                <h1 className="text-xl font-black flex items-center gap-2"><Icons.Archive /> eKOKU <span className="text-[10px] bg-green-500 px-2 rounded-full">LIVE</span></h1>
+                                <p className="text-[9px] font-bold opacity-50 tracking-widest">SKPK MIRI</p>
+                            </div>
+                        </div>
+                        <nav className="p-2 grid grid-cols-3 md:grid-cols-6 gap-1 bg-slate-800/50">
+                            {navItems.map(item => (
+                                <button key={item.id} onClick={() => setCurrentView(item.id)} className={`flex flex-col items-center p-2 rounded-lg transition ${currentView === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}>
+                                    <item.icon /><span className="text-[9px] mt-1 font-bold uppercase">{item.label}</span>
+                                </button>
+                            ))}
+                        </nav>
+                    </header>
+                    <main className="flex-1 p-4 md:p-8 max-w-5xl mx-auto w-full">
+                        {currentView === 'laporan_baru' && <LaporanForm />}
+                        {currentView === 'rekod_laporan' && <RekodLaporan />}
+                        {currentView === 'kehadiran_baru' && <KehadiranForm />}
+                        {currentView === 'rekod_kehadiran' && <div className="space-y-4">{attendanceRecords.map(r=>(<div key={r.id} className="p-4 bg-white border rounded-xl flex justify-between items-center shadow-sm"><div><p className="font-bold text-xs uppercase">{r.aktiviti}</p><p className="text-[10px] text-slate-400">{r.tarikh}</p></div><Icons.ClipboardList /></div>))}</div>}
+                        {currentView === 'rumusan' && <div className="p-10 text-center bg-white border rounded-2xl italic text-slate-400">Analisis Kehadiran Berfungsi Secara Automatik mengikut unit yang dipilih di tab kehadiran.</div>}
+                        {currentView === 'tetapan' && <TetapanData />}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
